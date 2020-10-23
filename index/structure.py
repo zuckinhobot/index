@@ -2,6 +2,7 @@ from IPython.display import clear_output
 from typing import List, Set, Union
 from abc import abstractmethod
 from functools import total_ordering
+import random
 from os import path
 import os
 import pickle
@@ -80,16 +81,23 @@ class TermOccurrence:
         self.term_freq = term_freq
 
     def write(self, idx_file):
-        pass
+        db = [self.term_id, self.doc_id, self.term_freq]
+        pickle.dump(db, idx_file)
 
     def __hash__(self):
-        return hash((self.doc_id, self.term_id))
+        return hash((self.term_id, self.term_id))
 
     def __eq__(self, other_occurrence: "TermOccurrence"):
-        return False
+        if not type(other_occurrence) == TermOccurrence:
+            return False
+        return ((self.term_id, self.doc_id) ==
+                    (other_occurrence.term_id, other_occurrence.doc_id))
 
     def __lt__(self, other_occurrence: "TermOccurrence"):
-        return False
+        if not type(other_occurrence) == TermOccurrence:
+            return False
+        return ((self.term_id, self.doc_id) <
+                (other_occurrence.term_id, other_occurrence.doc_id))
 
     def __str__(self):
         return f"(term_id:{self.term_id} doc: {self.doc_id} freq: {self.term_freq})"
@@ -155,12 +163,19 @@ class FileIndex(Index):
             self.save_tmp_occurrences()
 
     def next_from_list(self) -> TermOccurrence:
-        return None
+        try:
+            return self.lst_occurrences_tmp.pop()
+        except Exception as e:
+            return None
 
     def next_from_file(self, file_idx) -> TermOccurrence:
-        # next_from_file = pickle.load(file_idx)
         bytes_doc_id = file_idx.read(4)
         if not bytes_doc_id:
+            return None
+        try:
+            next_from_file = pickle.load(file_idx)
+            return self.lst_occurrences_tmp.pop()
+        except Exception as e:
             return None
         # seu código aqui :)
 
@@ -172,7 +187,7 @@ class FileIndex(Index):
         # Para eficiencia, todo o codigo deve ser feito com o garbage
         # collector desabilitado
         gc.disable()
-
+        self.lst_occurrences_tmp.sort()
         # ordena pelo term_id, doc_id
 
         # Abra um arquivo novo faça a ordenação externa: compar sempre a primeira posição
