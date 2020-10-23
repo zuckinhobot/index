@@ -16,17 +16,17 @@ class Index:
     def index(self, term: str, doc_id: int, term_freq: int):
         if term not in self.dic_index:
             int_term_id = len(self.set_documents) + 1
-            self.set_documents.add(int_term_id)
             self.dic_index[term] = self.create_index_entry(int_term_id)
         else:
             int_term_id = self.get_term_id(term)
-
+        if not doc_id in self.set_documents:
+            self.set_documents.add(doc_id)
         self.add_index_occur(
             self.dic_index[term], doc_id, int_term_id, term_freq)
 
     @property
     def vocabulary(self) -> List:
-        return [term for term in self.dic_index]
+        return self.dic_index.keys()
 
     @property
     def document_count(self) -> int:
@@ -117,7 +117,7 @@ class HashIndex(Index):
 
 
 class TermFilePosition:
-    def __init__(self, term_id: int,  term_file_start_pos: int = None, doc_count_with_term: int = None):
+    def __init__(self, term_id: int, term_file_start_pos: int = None, doc_count_with_term: int = None):
         self.term_id = term_id
 
         # a serem definidos após a indexação
@@ -132,7 +132,6 @@ class TermFilePosition:
 
 
 class FileIndex(Index):
-
     TMP_OCCURRENCES_LIMIT = 1000000
 
     def __init__(self):
@@ -148,7 +147,7 @@ class FileIndex(Index):
     def create_index_entry(self, term_id: int) -> TermFilePosition:
         return TermFilePosition(term_id)
 
-    def add_index_occur(self, entry_dic_index: TermFilePosition,  doc_id: int, term_id: int, term_freq: int):
+    def add_index_occur(self, entry_dic_index: TermFilePosition, doc_id: int, term_id: int, term_freq: int):
         self.lst_occurrences_tmp.append(
             TermOccurrence(doc_id, term_id, term_freq))
 
@@ -159,7 +158,7 @@ class FileIndex(Index):
         return None
 
     def next_from_file(self, file_idx) -> TermOccurrence:
-            #next_from_file = pickle.load(file_idx)
+        # next_from_file = pickle.load(file_idx)
         bytes_doc_id = file_idx.read(4)
         if not bytes_doc_id:
             return None
