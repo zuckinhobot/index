@@ -91,7 +91,7 @@ class TermOccurrence:
         if not type(other_occurrence) == TermOccurrence:
             return False
         return ((self.term_id, self.doc_id) ==
-                    (other_occurrence.term_id, other_occurrence.doc_id))
+                (other_occurrence.term_id, other_occurrence.doc_id))
 
     def __lt__(self, other_occurrence: "TermOccurrence"):
         if not type(other_occurrence) == TermOccurrence:
@@ -146,8 +146,9 @@ class FileIndex(Index):
         super().__init__()
 
         self.lst_occurrences_tmp = []
+        self.lst_occurrences_tmp_file = []
         self.idx_file_counter = 0
-        self.str_idx_file_name = "occur_idx_file"
+        self.str_idx_file_name = None
 
     def get_term_id(self, term: str):
         return self.dic_index[term].term_id
@@ -164,35 +165,66 @@ class FileIndex(Index):
 
     def next_from_list(self) -> TermOccurrence:
         try:
-            return self.lst_occurrences_tmp.pop()
+            return self.lst_occurrences_tmp.pop(0)
         except Exception as e:
+            print(f"Excecao ao pegar proximo da lista em next_from_list: {e}")
             return None
 
-    def next_from_file(self, file_idx) -> TermOccurrence:
-        bytes_doc_id = file_idx.read(4)
-        if not bytes_doc_id:
-            return None
+    def next_from_file(self, file_idx=None) -> TermOccurrence:
+        if not self.lst_occurrences_tmp_file and file_idx is not None:
+            try:
+                self.lst_occurrences_tmp_file = pickle.load(file_idx)
+            except Exception as e:
+                print(f"Excecao ao abir arquivo em next_from_file: {e}")
+                return None
+
         try:
-            next_from_file = pickle.load(file_idx)
-            return self.lst_occurrences_tmp.pop()
+            return self.lst_occurrences_tmp_file.pop(0)
         except Exception as e:
+            print(f"Excecao ao pegar proximo da lista em next_from_file: {e}")
             return None
-        # seu código aqui :)
-
-        return TermOccurrence(doc_id, term_id, term_freq)
 
     def save_tmp_occurrences(self):
-
-        # ordena pelo term_id, doc_id
         # Para eficiencia, todo o codigo deve ser feito com o garbage
         # collector desabilitado
         gc.disable()
-        self.lst_occurrences_tmp.sort()
         # ordena pelo term_id, doc_id
+        self.lst_occurrences_tmp = sorted(self.lst_occurrences_tmp)
 
-        # Abra um arquivo novo faça a ordenação externa: compar sempre a primeira posição
-        # da lista com a primeira possição do arquivo usando os métodos next_from_list e next_from_file
-        # para armazenar no novo indice ordenado
+        if self.idx_file_counter > 0:
+            old_file_name = self.str_idx_file_name
+            new_file_name = 'occur_index_{counter}.idx'.format(
+                counter=self.idx_file_counter)
+
+            memory_list = []
+            next_from_list = self.next_from_list()
+            while next_from_list is not None:
+                memory_list.append(next_from_list)
+                next_from_list = self.next_from_list()
+
+            file_list = []
+            with open(old_file_name, 'rb') as old_file:
+                next_from_file = self.next_from_file(old_file)
+                while next_from_file is not None:
+                    file_list.append(next_from_file)
+                    next_from_file = self.next_from_file(old_file)
+
+            lst_occurrences_tmp_new_file = file_list + memory_list
+            lst_occurrences_tmp_new_file = sorted(lst_occurrences_tmp_new_file)[: self.TMP_OCCURRENCES_LIMIT]
+
+            with open(new_file_name, 'wb') as new_file:
+                pickle.dump(lst_occurrences_tmp_new_file, new_file)
+            self.str_idx_file_name = new_file_name
+
+        else:
+            new_file_name = 'occur_index_0.idx'
+            with open(new_file_name, 'wb') as idx_file:
+                pickle.dump(self.lst_occurrences_tmp, idx_file)
+            self.str_idx_file_name = new_file_name
+
+        self.lst_occurrences_tmp = []
+        self.lst_occurrences_tmp_file = []
+        self.idx_file_counter = self.idx_file_counter + 1
 
         gc.enable()
 
