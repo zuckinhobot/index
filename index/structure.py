@@ -190,12 +190,10 @@ class FileIndex(Index):
         gc.disable()
         # ordena pelo term_id, doc_id
         self.lst_occurrences_tmp = sorted(self.lst_occurrences_tmp)
+        new_file_name = 'occur_index_{counter}.idx'.format(
+            counter=self.idx_file_counter)
 
         if self.idx_file_counter > 0:
-            old_file_name = self.str_idx_file_name
-            new_file_name = 'occur_index_{counter}.idx'.format(
-                counter=self.idx_file_counter)
-
             memory_list = []
             next_from_list = self.next_from_list()
             while next_from_list is not None:
@@ -203,25 +201,19 @@ class FileIndex(Index):
                 next_from_list = self.next_from_list()
 
             file_list = []
+            old_file_name = self.str_idx_file_name
             with open(old_file_name, 'rb') as old_file:
                 next_from_file = self.next_from_file(old_file)
                 while next_from_file is not None:
                     file_list.append(next_from_file)
                     next_from_file = self.next_from_file(old_file)
 
-            lst_occurrences_tmp_new_file = file_list + memory_list
-            lst_occurrences_tmp_new_file = sorted(lst_occurrences_tmp_new_file)[: self.TMP_OCCURRENCES_LIMIT]
+            self.lst_occurrences_tmp = sorted(file_list + memory_list)
 
-            with open(new_file_name, 'wb') as new_file:
-                pickle.dump(lst_occurrences_tmp_new_file, new_file)
-            self.str_idx_file_name = new_file_name
+        with open(new_file_name, 'wb') as idx_file:
+            pickle.dump(self.lst_occurrences_tmp, idx_file)
 
-        else:
-            new_file_name = 'occur_index_0.idx'
-            with open(new_file_name, 'wb') as idx_file:
-                pickle.dump(self.lst_occurrences_tmp, idx_file)
-            self.str_idx_file_name = new_file_name
-
+        self.str_idx_file_name = new_file_name
         self.lst_occurrences_tmp = []
         self.lst_occurrences_tmp_file = []
         self.idx_file_counter = self.idx_file_counter + 1
