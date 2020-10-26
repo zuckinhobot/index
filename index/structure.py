@@ -268,8 +268,9 @@ class FileIndex(Index):
                         occurence_list.append(next_from_file)
             except Exception as e:
                 print(f"Excecao ao ler/abir arquivo em get_occurrence_list: {e}")
+                return []
 
         return occurence_list
 
     def document_count_with_term(self, term: str) -> int:
-        return self.dic_index[term].doc_count_with_term
+        return self.dic_index[term].doc_count_with_term if term in self.dic_index else 0
