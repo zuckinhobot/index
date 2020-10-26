@@ -207,7 +207,6 @@ class FileIndex(Index):
             with open(old_file_name, 'rb') as old_file:
                 next_from_file = self.next_from_file(old_file)
                 while next_from_file is not None:
-                    print(next_from_file)
                     file_list.append(
                         [next_from_file.term_id, next_from_file.doc_id, next_from_file.term_freq])
                     next_from_file = self.next_from_file(old_file)
@@ -256,7 +255,21 @@ class FileIndex(Index):
                 doc_count = 0
 
     def get_occurrence_list(self, term: str) -> List:
-        return []
+        file_position = self.dic_index[term].term_file_start_pos
+        count = self.dic_index[term].doc_count_with_term
+        occurence_list = []
+        with open(self.str_idx_file_name, 'rb') as idx_file:
+            try:
+                idx_file.read(file_position)
+                idx_file.tell()
+                for _ in range(count):
+                    next_from_file = self.next_from_file(idx_file)
+                    if next_from_file is not None:
+                        occurence_list.append(next_from_file)
+            except Exception as e:
+                print(f"Excecao ao ler/abir arquivo em get_occurrence_list: {e}")
+
+        return occurence_list
 
     def document_count_with_term(self, term: str) -> int:
-        return 0
+        return self.dic_index[term].doc_count_with_term
