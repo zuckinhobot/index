@@ -255,6 +255,8 @@ class FileIndex(Index):
                 doc_count = 0
 
     def get_occurrence_list(self, term: str) -> List:
+        if not term in self.dic_index:
+            return []
         file_position = self.dic_index[term].term_file_start_pos
         count = self.dic_index[term].doc_count_with_term
         occurence_list = []
