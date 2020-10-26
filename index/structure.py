@@ -146,7 +146,6 @@ class FileIndex(Index):
         super().__init__()
 
         self.lst_occurrences_tmp = []
-        self.lst_occurrences_tmp_file = []
         self.idx_file_counter = 0
         self.str_idx_file_name = None
 
@@ -164,25 +163,26 @@ class FileIndex(Index):
             self.save_tmp_occurrences()
 
     def next_from_list(self) -> TermOccurrence:
-        try:
-            return self.lst_occurrences_tmp.pop(0)
-        except Exception as e:
-            print(f"Excecao ao pegar proximo da lista em next_from_list: {e}")
-            return None
-
-    def next_from_file(self, file_idx=None) -> TermOccurrence:
-        if not self.lst_occurrences_tmp_file and file_idx is not None:
+        if len(self.lst_occurrences_tmp) > 0 and self.lst_occurrences_tmp:
             try:
-                self.lst_occurrences_tmp_file = pickle.load(file_idx)
+                return self.lst_occurrences_tmp.pop(0)
+            except Exception as e:
+                print(
+                    f"Excecao ao pegar proximo da lista em next_from_list: {e}")
+                return None
+        return None
+
+    def next_from_file(self, file_idx) -> TermOccurrence:
+        if file_idx is not None:
+            try:
+                next_from_pickle = pickle.load(file_idx)
+                saved_occurrence = TermOccurrence(
+                    next_from_pickle[1], next_from_pickle[0], next_from_pickle[2])
+                return saved_occurrence
             except Exception as e:
                 print(f"Excecao ao abir arquivo em next_from_file: {e}")
                 return None
-
-        try:
-            return self.lst_occurrences_tmp_file.pop(0)
-        except Exception as e:
-            print(f"Excecao ao pegar proximo da lista em next_from_file: {e}")
-            return None
+        return None
 
     def save_tmp_occurrences(self):
         # Para eficiencia, todo o codigo deve ser feito com o garbage
@@ -191,39 +191,39 @@ class FileIndex(Index):
         # ordena pelo term_id, doc_id
         self.lst_occurrences_tmp = sorted(self.lst_occurrences_tmp)
 
-        if self.idx_file_counter > 0:
-            old_file_name = self.str_idx_file_name
-            new_file_name = 'occur_index_{counter}.idx'.format(
-                counter=self.idx_file_counter)
-
-            memory_list = []
+        memory_list = []
+        next_from_list = self.next_from_list()
+        while next_from_list is not None:
+            memory_list.append(
+                [next_from_list.term_id, next_from_list.doc_id, next_from_list.term_freq])
             next_from_list = self.next_from_list()
-            while next_from_list is not None:
-                memory_list.append(next_from_list)
-                next_from_list = self.next_from_list()
 
+        new_file_name = 'data/occur_index_{counter}.idx'.format(
+            counter=self.idx_file_counter)
+
+        if self.idx_file_counter > 0:
             file_list = []
+            old_file_name = self.str_idx_file_name
             with open(old_file_name, 'rb') as old_file:
                 next_from_file = self.next_from_file(old_file)
                 while next_from_file is not None:
-                    file_list.append(next_from_file)
+                    print(next_from_file)
+                    file_list.append(
+                        [next_from_file.term_id, next_from_file.doc_id, next_from_file.term_freq])
                     next_from_file = self.next_from_file(old_file)
 
-            lst_occurrences_tmp_new_file = file_list + memory_list
-            lst_occurrences_tmp_new_file = sorted(lst_occurrences_tmp_new_file)[: self.TMP_OCCURRENCES_LIMIT]
+            memory_list = sorted(
+                file_list + memory_list, key=lambda x: (x[0], x[1]))
 
-            with open(new_file_name, 'wb') as new_file:
-                pickle.dump(lst_occurrences_tmp_new_file, new_file)
-            self.str_idx_file_name = new_file_name
+        with open(new_file_name, 'wb') as idx_file:
+            for occurrence in memory_list:
+                pickle.dump(occurrence, idx_file)
 
-        else:
-            new_file_name = 'occur_index_0.idx'
-            with open(new_file_name, 'wb') as idx_file:
-                pickle.dump(self.lst_occurrences_tmp, idx_file)
-            self.str_idx_file_name = new_file_name
-
+        if self.str_idx_file_name:
+            os.remove(self.str_idx_file_name)
+        
+        self.str_idx_file_name = new_file_name
         self.lst_occurrences_tmp = []
-        self.lst_occurrences_tmp_file = []
         self.idx_file_counter = self.idx_file_counter + 1
 
         gc.enable()
@@ -236,12 +236,24 @@ class FileIndex(Index):
         # id_termo -> obj_termo armazene-o em dic_ids_por_termo
         dic_ids_por_termo = {}
         for str_term, obj_term in self.dic_index.items():
-            pass
+            dic_ids_por_termo[obj_term.term_id] = str_term
 
         with open(self.str_idx_file_name, 'rb') as idx_file:
-            # navega nas ocorrencias para atualizar cada termo em dic_ids_por_termo
-            # apropriadamente
-            pass
+            next_from_file = self.next_from_file(idx_file)
+            file_start_pos = 0
+            occur_size = idx_file.tell()
+            doc_count = 0
+            while next_from_file is not None:
+                term_id = next_from_file.term_id
+                selected_term = dic_ids_por_termo[term_id]
+                while next_from_file is not None and next_from_file.term_id == term_id:
+                    doc_count = doc_count + 1
+                    next_from_file = self.next_from_file(idx_file)
+                
+                self.dic_index[selected_term] = TermFilePosition(
+                    term_id, file_start_pos, doc_count)
+                file_start_pos += occur_size * doc_count
+                doc_count = 0
 
     def get_occurrence_list(self, term: str) -> List:
         return []
