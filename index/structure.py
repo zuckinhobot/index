@@ -191,36 +191,35 @@ class FileIndex(Index):
         # ordena pelo term_id, doc_id
         self.lst_occurrences_tmp = sorted(self.lst_occurrences_tmp)
 
-        memory_list = []
-        next_from_list = self.next_from_list()
-        while next_from_list is not None:
-            memory_list.append(
-                [next_from_list.term_id, next_from_list.doc_id, next_from_list.term_freq])
-            next_from_list = self.next_from_list()
-
+        old_file_name = self.str_idx_file_name
         new_file_name = 'data/occur_index_{counter}.idx'.format(
             counter=self.idx_file_counter)
-
-        if self.idx_file_counter > 0:
-            file_list = []
-            old_file_name = self.str_idx_file_name
-            with open(old_file_name, 'rb') as old_file:
-                next_from_file = self.next_from_file(old_file)
-                while next_from_file is not None:
-                    file_list.append(
-                        [next_from_file.term_id, next_from_file.doc_id, next_from_file.term_freq])
-                    next_from_file = self.next_from_file(old_file)
-
-            memory_list = sorted(
-                file_list + memory_list, key=lambda x: (x[0], x[1]))
-
         with open(new_file_name, 'wb') as idx_file:
-            for occurrence in memory_list:
-                pickle.dump(occurrence, idx_file)
+            if old_file_name is not None:
+                with open(old_file_name, 'rb') as old_file:
+                    next_from_list = self.next_from_list()
+                    next_from_file = self.next_from_file(old_file)
+                    while next_from_list is not None or next_from_file is not None:
+                        if next_from_list is None or next_from_file is None:
+                            next_to_write = "file" if next_from_file is not None else "list"
+                        else:
+                            next_to_write = "file" if next_from_file < next_from_list else "list"
+
+                        if next_to_write == "list":
+                            pickle.dump([next_from_list.term_id, next_from_list.doc_id, next_from_list.term_freq], idx_file)
+                            next_from_list = self.next_from_list()
+                        else:
+                            pickle.dump([next_from_file.term_id, next_from_file.doc_id, next_from_file.term_freq], idx_file)
+                            next_from_file = self.next_from_file(old_file)
+            else:
+                next_from_list = self.next_from_list()
+                while next_from_list is not None:
+                    pickle.dump([next_from_list.term_id, next_from_list.doc_id, next_from_list.term_freq], idx_file)
+                    next_from_list = self.next_from_list()
 
         if self.str_idx_file_name:
             os.remove(self.str_idx_file_name)
-        
+
         self.str_idx_file_name = new_file_name
         self.lst_occurrences_tmp = []
         self.idx_file_counter = self.idx_file_counter + 1
