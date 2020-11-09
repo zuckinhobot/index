@@ -66,12 +66,24 @@ class HTMLIndexer:
 
     def text_word_count(self, plain_text: str):
         dic_word_count = {}
-
+        for word in word_tokenize(plain_text):
+            preprocessed_word = self.cleaner.preprocess_word(word)
+            if preprocessed_word and preprocessed_word not in ["?","!",".",",",";",":"]:
+                dic_word_count[preprocessed_word] = dic_word_count.get(preprocessed_word, 0) + 1
         return dic_word_count
 
     def index_text(self, doc_id: int, text_html: str):
-        pass
+        text = self.cleaner.html_to_plain_text(text_html)
+        word_count = self.text_word_count(text)
+
+        for k, v in word_count.items():
+            self.index.index(k, doc_id, v)
 
     def index_text_dir(self, path: str):
         for str_sub_dir in os.listdir(path):
             path_sub_dir = f"{path}/{str_sub_dir}"
+            for filename in os.listdir(path_sub_dir):
+                if filename.endswith(".html"):
+                    with open(f"{path_sub_dir}/{filename}") as file:
+                        doc_id = int(filename[:-5])
+                        self.index_text(doc_id, file)
